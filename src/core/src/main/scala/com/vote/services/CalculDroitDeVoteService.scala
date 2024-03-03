@@ -46,21 +46,28 @@ trait CalculDroitDeVoteService {
     isMajeur = personneService.isMajeur(personne)
     mandatoryRequestValid = isMajeur
 
-    hasSpecialAuthorisation =
-      if (mandatoryRequestValid) { personneService.hasSpecialAuthorisation(personne) }
-      else false
+    hasSpecialAuthorisation = maybeCheckHasSpecial(mandatoryRequestValid, personne)
 
     needCheckEligibleFromJustice =
       mandatoryRequestValid && !hasSpecialAuthorisation
-    isEligibleForVoting <-
-      if (needCheckEligibleFromJustice) isEligibleFromJustice(identifiantPersonne)
-      else Future.successful(false)
+    isEligibleForVoting <- maybeCheckEligibleFromJustice(needCheckEligibleFromJustice, identifiantPersonne)
 
     needCheckEligibleFromJusticeEtrangere = mandatoryRequestValid && (!hasSpecialAuthorisation && !isEligibleForVoting)
     hasNotDossiersEtranger <-
       if (needCheckEligibleFromJusticeEtrangere) hasNoDossierFromJusticeEtrangere(identifiantPersonne)
       else Future.successful(false)
   } yield mandatoryRequestValid && (hasSpecialAuthorisation || isEligibleForVoting || hasNotDossiersEtranger)
+
+  private def maybeCheckEligibleFromJustice(
+      needCheck: Boolean,
+      identifiantPersonne: IdentifiantPersonne,
+      default: Boolean = false
+  ): Future[Boolean] =
+    if (needCheck) isEligibleFromJustice(identifiantPersonne)
+    else Future.successful(default)
+  private def maybeCheckHasSpecial(needCheck: Boolean, personne: Personne, default: Boolean = false): Boolean =
+    if (needCheck) personneService.hasSpecialAuthorisation(personne)
+    else default
 
   private def hasNoDossierFromJusticeEtrangere(identifiantPersonne: IdentifiantPersonne): Future[Boolean] =
     justiceEtrangereService
