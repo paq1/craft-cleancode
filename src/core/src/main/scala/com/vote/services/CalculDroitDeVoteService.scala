@@ -44,41 +44,37 @@ trait CalculDroitDeVoteService {
   )(implicit ctx: Context): Future[Boolean] = for {
     personne <- personneService.getPersonne(identifiantPersonne)
     isMajeur = personneService.isMajeur(personne)
+    mandatoryRequestValid = isMajeur
 
     hasSpecialAuthorisation =
-      if (isMajeur) {
-        personneService.hasSpecialAuthorisation(personne)
-      } else {
-        false
-      }
+      if (mandatoryRequestValid) { personneService.hasSpecialAuthorisation(personne) }
+      else false
 
-    needCheckEligibleFromJustice = isMajeur && !hasSpecialAuthorisation
-
+    needCheckEligibleFromJustice =
+      mandatoryRequestValid && !hasSpecialAuthorisation
     isEligibleForVoting <-
-      if (needCheckEligibleFromJustice) {
-        justiceService
-          .getDossiersJusticeFromIdentifiantPersonne(
-            identifiantPersonne
-          )
-          .map(justiceService.isEligibleForVoting(_))
-      } else {
-        Future.successful(false)
-      }
+      if (needCheckEligibleFromJustice) isEligibleFromJustice(identifiantPersonne)
+      else Future.successful(false)
 
-    needCheckEligibleFromJusticeEtrangere =
-      isMajeur && (!hasSpecialAuthorisation && !isEligibleForVoting)
+    needCheckEligibleFromJusticeEtrangere = mandatoryRequestValid && (!hasSpecialAuthorisation && !isEligibleForVoting)
     hasNotDossiersEtranger <-
-      if (needCheckEligibleFromJusticeEtrangere) {
-        justiceEtrangereService
-          .getDossierFromIdentifiantPersonne(identifiantPersonne)
-          .map { dossiesEtranger =>
-            !justiceEtrangereService.hasDossiers(dossiesEtranger)
-          }
-      } else {
-        Future.successful(false)
-      }
+      if (needCheckEligibleFromJusticeEtrangere) hasNoDossierFromJusticeEtrangere(identifiantPersonne)
+      else Future.successful(false)
+  } yield mandatoryRequestValid && (hasSpecialAuthorisation || isEligibleForVoting || hasNotDossiersEtranger)
 
-  } yield isMajeur && (hasSpecialAuthorisation || isEligibleForVoting || hasNotDossiersEtranger)
+  private def hasNoDossierFromJusticeEtrangere(identifiantPersonne: IdentifiantPersonne): Future[Boolean] =
+    justiceEtrangereService
+      .getDossierFromIdentifiantPersonne(identifiantPersonne)
+      .map { dossiesEtranger => !justiceEtrangereService.hasDossiers(dossiesEtranger) }
+
+  private def isEligibleFromJustice(
+      identifiantPersonne: IdentifiantPersonne
+  ): Future[Boolean] =
+    justiceService
+      .getDossiersJusticeFromIdentifiantPersonne(
+        identifiantPersonne
+      )
+      .map(justiceService.isEligibleForVoting(_))
 
   //  def canVote(
 //      identifiantPersonne: IdentifiantPersonne
@@ -92,68 +88,68 @@ trait CalculDroitDeVoteService {
 //      .map { case (result, _, _, _) => result }
 //  }
 
-  private def isMajeur(
-      personne: Personne
-  )(implicit ctx: Context): (Boolean, Option[Personne]) =
-    if (personneService.isMajeur(personne)) {
-      (true, Some(personne))
-    } else {
-      (false, None)
-    }
-
-  private def hasSpectialAutorisation(
-      inputs: (Boolean, Option[Personne])
-  ): (Boolean, Option[Personne]) =
-    inputs match {
-      case (_, Some(personne)) =>
-        if (personneService.hasSpecialAuthorisation(personne)) {
-          (true, None)
-        } else {
-          (false, Some(personne))
-        }
-      case (result, _) => (result, None)
-    }
-
-  private def isEligibleForVoting(
-      inputs: (Boolean, Option[Personne])
-  ): Future[(Boolean, Option[Personne], Option[List[Dossier]])] = inputs match {
-    case (_, Some(personne)) =>
-      justiceService
-        .getDossiersJusticeFromIdentifiantPersonne(personne.identifiant)
-        .map { dossiers =>
-          if (justiceService.isEligibleForVoting(dossiers)) {
-            (true, None, None)
-          } else {
-            (false, Some(personne), Some(dossiers))
-          }
-        }
-    case (result, _) => Future.successful((result, None, None))
-  }
-
-  private def hasNotDossierJusticeEtrangere(
-      inputs: (Boolean, Option[Personne], Option[List[Dossier]])
-  ): Future[
-    (Boolean, Option[Personne], Option[List[Dossier]], Option[List[Unit]])
-  ] = {
-    inputs match {
-      case (_, Some(personne), Some(dossier)) =>
-        justiceEtrangereService
-          .getDossierFromIdentifiantPersonne(personne.identifiant)
-          .map { dossiersJusticeEtrangere =>
-            if (justiceEtrangereService.hasDossiers(dossiersJusticeEtrangere)) {
-              (
-                false,
-                Some(personne),
-                Some(dossier),
-                Some(dossiersJusticeEtrangere)
-              )
-            } else {
-              (true, None, None, None)
-            }
-          }
-      case (result, _, _) =>
-        Future.successful((result, None, None, None))
-    }
-  }
+//  private def isMajeur(
+//      personne: Personne
+//  )(implicit ctx: Context): (Boolean, Option[Personne]) =
+//    if (personneService.isMajeur(personne)) {
+//      (true, Some(personne))
+//    } else {
+//      (false, None)
+//    }
+//
+//  private def hasSpectialAutorisation(
+//      inputs: (Boolean, Option[Personne])
+//  ): (Boolean, Option[Personne]) =
+//    inputs match {
+//      case (_, Some(personne)) =>
+//        if (personneService.hasSpecialAuthorisation(personne)) {
+//          (true, None)
+//        } else {
+//          (false, Some(personne))
+//        }
+//      case (result, _) => (result, None)
+//    }
+//
+//  private def isEligibleForVoting(
+//      inputs: (Boolean, Option[Personne])
+//  ): Future[(Boolean, Option[Personne], Option[List[Dossier]])] = inputs match {
+//    case (_, Some(personne)) =>
+//      justiceService
+//        .getDossiersJusticeFromIdentifiantPersonne(personne.identifiant)
+//        .map { dossiers =>
+//          if (justiceService.isEligibleForVoting(dossiers)) {
+//            (true, None, None)
+//          } else {
+//            (false, Some(personne), Some(dossiers))
+//          }
+//        }
+//    case (result, _) => Future.successful((result, None, None))
+//  }
+//
+//  private def hasNotDossierJusticeEtrangere(
+//      inputs: (Boolean, Option[Personne], Option[List[Dossier]])
+//  ): Future[
+//    (Boolean, Option[Personne], Option[List[Dossier]], Option[List[Unit]])
+//  ] = {
+//    inputs match {
+//      case (_, Some(personne), Some(dossier)) =>
+//        justiceEtrangereService
+//          .getDossierFromIdentifiantPersonne(personne.identifiant)
+//          .map { dossiersJusticeEtrangere =>
+//            if (justiceEtrangereService.hasDossiers(dossiersJusticeEtrangere)) {
+//              (
+//                false,
+//                Some(personne),
+//                Some(dossier),
+//                Some(dossiersJusticeEtrangere)
+//              )
+//            } else {
+//              (true, None, None, None)
+//            }
+//          }
+//      case (result, _, _) =>
+//        Future.successful((result, None, None, None))
+//    }
+//  }
 
 }
