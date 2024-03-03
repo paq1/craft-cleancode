@@ -19,7 +19,6 @@ class CalculDroitDeVoteSpec
     with ContextFixture
     with AsyncMockFactory {
 
-
   it should "false if is not majeur and dont check anything" in {
     (personneServiceMock
       .getPersonne(_: IdentifiantPersonne))
@@ -224,7 +223,6 @@ class CalculDroitDeVoteSpec
       .map { res => res shouldBe true }
   }
 
-
   lazy val calculDroitDeVoteService: CalculDroitDeVoteService =
     new CalculDroitDeVoteService {
 
@@ -235,9 +233,9 @@ class CalculDroitDeVoteSpec
         justiceEtrangereServiceMock
     }
 
-  val personneServiceMock: PersonneService = mock[PersonneService]
-  val justiceServiceMock: JusticeService = mock[JusticeService]
-  val justiceEtrangereServiceMock: JusticeEtrangereService =
+  lazy val personneServiceMock: PersonneService = mock[PersonneService]
+  lazy val justiceServiceMock: JusticeService = mock[JusticeService]
+  lazy val justiceEtrangereServiceMock: JusticeEtrangereService =
     mock[JusticeEtrangereService]
 
 }

@@ -21,9 +21,6 @@ trait CalculDroitDeVoteService {
   /** les problemes sont les suivants:
     *  -> si la personne n'est pas majeur, on fait quand meme les autres call alors qu'on pourrait retourner faux.
     *  -> on fait tous les call des "ou" alors que si 1 est vrai pas besoins de verif le reste
-    * @param identifiantPersonne
-    * @param ctx
-    * @return
     */
 //  def canVote(
 //      identifiantPersonne: IdentifiantPersonne
@@ -55,8 +52,10 @@ trait CalculDroitDeVoteService {
         false
       }
 
+    needCheckEligibleFromJustice = isMajeur && !hasSpecialAuthorisation
+
     isEligibleForVoting <-
-      if (isMajeur && !hasSpecialAuthorisation) {
+      if (needCheckEligibleFromJustice) {
         justiceService
           .getDossiersJusticeFromIdentifiantPersonne(
             identifiantPersonne
@@ -66,8 +65,10 @@ trait CalculDroitDeVoteService {
         Future.successful(false)
       }
 
+    needCheckEligibleFromJusticeEtrangere =
+      isMajeur && (!hasSpecialAuthorisation && !isEligibleForVoting)
     hasNotDossiersEtranger <-
-      if (isMajeur && (!hasSpecialAuthorisation && !isEligibleForVoting)) {
+      if (needCheckEligibleFromJusticeEtrangere) {
         justiceEtrangereService
           .getDossierFromIdentifiantPersonne(identifiantPersonne)
           .map { dossiesEtranger =>
